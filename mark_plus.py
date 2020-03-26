@@ -1,8 +1,8 @@
  
 
 from albertk import *
-import traceback
 model,tokenizer=load_albert("data/albert_tiny")
+
 
 
 
@@ -16,13 +16,13 @@ def run():
     tt=tkitText.Text()
     text_list=[]
 
-    text=''
-    kw = input("输入关键词:")
-    for it in search_sent(kw):
+    # text=''
+    keyword = input("输入关键词:")
+    # for it in search_sent(kw):
 
-        # text=text+"。"+it.content
-        if len(it.content)>5:
-            text_list.append(it.content)
+    #     # text=text+"。"+it.content
+    #     if len(it.content)>5:
+    #         text_list.append(it.content)
 
     # for it in search_content(kw):
         # text=text+it.title+"。"+it.content
@@ -32,7 +32,9 @@ def run():
 
     c_list=read_labels()
     data=[]
-
+    klist=run_search_sent(keyword,tokenizer,model,20)
+    for k in klist.keys():
+        text_list=text_list+klist[k]
     for it in text_list:
         print("##"*29)
         pprint.pprint(c_list)
@@ -54,11 +56,11 @@ def run():
         try:
 
 
-            pre=auto_train(new_text_list,marked_text,marked_label,tokenizer,model,n_neighbors=len(c_list)*10)
+            pre=auto_train(new_text_list,marked_text,marked_label,tokenizer,model,n_neighbors=len(c_list))
 
-            print("预测：",pre)
+            # print("预测：",pre)
             for i,p in enumerate( pre):
-                print(p)
+                # print(type(p))
                 # print("句子：",new_text_list[i])
                 
                 try:
@@ -67,8 +69,6 @@ def run():
                 except:
                     pass
         except:
-            traceback.print_exc()
-
             pass
         c = input("输入对应标签(新建输入n):")
         if c=="n":
