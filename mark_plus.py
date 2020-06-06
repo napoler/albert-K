@@ -32,7 +32,7 @@ def run():
 
     c_list=read_labels()
     data=[]
-    klist=run_search_sent(keyword,tokenizer,model,20)
+    klist=run_search_sent(keyword,tokenizer,model,3)
     for k in klist.keys():
         text_list=text_list+klist[k]
     for it in text_list:

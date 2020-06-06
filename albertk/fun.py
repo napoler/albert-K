@@ -1,15 +1,16 @@
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from kmeans_pytorch import kmeans,kmeans_predict
 import os
-
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans as sk_KMeans
 from transformers import AlbertModel, BertTokenizer,AlbertConfig
 import torch
 import torch.nn as nn
 import tkitText,tkitFile
-from albert_kmeans import *
+import traceback
+# from albert_kmeans import *
 import pprint
 
 device="cpu"
@@ -62,9 +63,15 @@ def search_sent(keyword):
     s = Search(using=client, index="pet-sent-index").query(q)
     response = s.execute()
     return response
-
-
 def find_sent(keyword):
+    text=''
+    for sent in search_sent(keyword):
+        # print(sent)
+        text=text+sent.content
+    text_list=tt.sentence_segmentation_v1(text)
+    return text_list
+
+def find_content(keyword):
     text=''
     for sent in search_content(keyword):
         # print(sent)
@@ -93,9 +100,11 @@ def get_embedding_np(text_list,labels,tokenizer,model):
     """
     # text_list=["你好吗",'我很不错']
     # li=torch.tensor([])  # 现有list时尽量用这种方式
+    # print(text_list)
     del_list=[]
     new_labels=[]
     new_text_list=[]
+    # presentence_embedding=None
     if len(text_list)>=0:
         pass
     else:
@@ -126,8 +135,9 @@ def get_embedding_np(text_list,labels,tokenizer,model):
                 new_labels.append(labels[i])
  
         except:
+            # traceback.print_exc()
             pass
-
+    # print(presentence_embedding)
     # print(new_text_list,new_labels)
     # presentence_embedding = torch.from_numpy(presentence_embedding)   #为numpy类型
     # print( "presentence_embedding",presentence_embedding.size())
@@ -200,6 +210,10 @@ def bulid_pre_dict(text_list,output_labels):
 def get_pre_label(text_list,output_labels):
     klist=bulid_pre_dict(text_list,output_labels)
     return klist,read_labels()
+# def sk_KMeans(presentence_embedding,n_cluster=10):
+#     kmeans = KMeans(n_clusters=n_cluster).fit(presentence_embedding)
+#     # print kmeans
+#     return kmeans
 
 def find_k(presentence_embedding,max=10):
     """
@@ -212,7 +226,7 @@ def find_k(presentence_embedding,max=10):
     p_y=[]
     p_x=[]
     for n_cluster in range(2, max):
-        kmeans = KMeans(n_clusters=n_cluster).fit(X)
+        kmeans = sk_KMeans(n_clusters=n_cluster).fit(X)
         label = kmeans.labels_
         sil_coeff = silhouette_score(X, label, metric='euclidean')
         print("For n_clusters={}, The Silhouette Coefficient is {}".format(n_cluster, sil_coeff))
@@ -268,6 +282,18 @@ def auto_train(new_text_list,marked_text,marked_label,tokenizer,model,n_neighbor
         return output_labels[-len(new_text_list):].tolist()
     else:
         print("不一样长：",len(presentence_embedding),len(labels))
+def auto_train_DBSCAN(new_text_list,tokenizer,model):
+    # 训练
+    presentence_embedding,text_list,_=get_embedding_np(new_text_list,[],tokenizer,model)
+    # print(presentence_embedding[:1])
+    y_pred = DBSCAN(eps = 0.1, min_samples = 2).fit_predict(presentence_embedding)
+    return y_pred
+
+def Pre_KMeans(new_text_list,tokenizer,model,n_cluster=10):
+    presentence_embedding,text_list,_=get_embedding_np(new_text_list,[],tokenizer,model)
+    kmeans = sk_KMeans(n_clusters=n_cluster).fit(presentence_embedding)
+    # print kmeans
+    return kmeans.labels_
 
 def read_labels():
     try:
@@ -280,7 +306,76 @@ def save_labels(c_list):
     with open("data/labels.json",'w') as f:
         json.dump(c_list,f)
 
+def run_search_content_DBSCAN(keyword,tokenizer,model,num_clusters=20):
+    """
+    对搜索结果进行聚类
+    基于sk的np数据
+    """
 
+    text_list=find_content(keyword)
+    cluster_ids_x=Pre_KMeans(text_list,tokenizer,model)
+    klist=bulid_pre_dict(text_list,cluster_ids_x.tolist())
+    return klist
+
+def kmeans_sk_content(text_list,tokenizer,model,num_clusters=20):
+    # presentence_embedding,text_list,labels=get_embedding(text_list,[],tokenizer,model)
+    # presentence_embedding=torch.tensor(presentence_embedding, dtype=torch.long)
+
+    cluster_ids_x=Pre_KMeans(text_list,tokenizer,model,num_clusters)
+    klist=bulid_pre_dict(text_list,cluster_ids_x.tolist())
+    # klist={}
+    # for i,c in enumerate (cluster_ids_x.tolist()):
+    #     # print(i,c,text_list)
+    #     if klist.get(c):
+    #         klist[c].append(text_list[i])
+    #     else:
+    #         klist[c]=[text_list[i]]
+    # # pprint.pprint(klist)
+    return klist
+
+def run_search_content_sk(keyword,tokenizer,model,num_clusters=20):
+    """
+    对搜索结果进行聚类
+    基于sk的np数据
+    """
+
+    text_list=find_content(keyword)
+    
+    klist=kmeans_sk_content(text_list,tokenizer,model,num_clusters)
+    return klist
+
+ 
+
+
+def kmeans_content(text_list,tokenizer,model,num_clusters=20):
+    presentence_embedding,text_list,labels=get_embedding(text_list,[],tokenizer,model)
+    presentence_embedding=torch.tensor(presentence_embedding, dtype=torch.long)
+
+    cluster_ids_x, cluster_centers = kmeans(
+        X=presentence_embedding, num_clusters=num_clusters, distance='euclidean', device=torch.device('cpu'),tol=1e-8
+    )
+    klist=bulid_pre_dict(text_list,cluster_ids_x.tolist())
+    # klist={}
+
+    # for i,c in enumerate (cluster_ids_x.tolist()):
+    #     # print(i,c,text_list)
+    #     if klist.get(c):
+    #         klist[c].append(text_list[i])
+    #     else:
+    #         klist[c]=[text_list[i]]
+    # # pprint.pprint(klist)
+    return klist
+
+def run_search_content(keyword,tokenizer,model,num_clusters=20):
+    """
+    对搜索结果进行聚类
+    """
+
+    text_list=find_content(keyword)
+    klist=kmeans_content(text_list,tokenizer,model,num_clusters)
+    return klist
+
+ 
 
 def run_search_sent(keyword,tokenizer,model,num_clusters=20):
     """
@@ -288,51 +383,53 @@ def run_search_sent(keyword,tokenizer,model,num_clusters=20):
     """
 
     text_list=find_sent(keyword)
-    presentence_embedding,text_list,labels=get_embedding(text_list,[],tokenizer,model)
-    # print("总共数据：",len(presentence_embedding))
-    presentence_embedding=torch.tensor(presentence_embedding, dtype=torch.long)
-    # print(text_list,labels)
-    
-    # # print('x',x )
-    # # # # kmeans
-    cluster_ids_x, cluster_centers = kmeans(
-        X=presentence_embedding, num_clusters=num_clusters, distance='euclidean', device=torch.device('cpu'),tol=1e-8
-    )
-    # print('cluster_ids_x',cluster_ids_x)
-    # print("cluster_centers",cluster_centers)
-
-    # output_dir='./model'
-    # torch.save(cluster_centers, os.path.join(output_dir, 'Kmean.bin'))
-
-
-    klist={}
-
-    for i,c in enumerate (cluster_ids_x.tolist()):
-        # print(i,c,text_list)
-        if klist.get(c):
-            klist[c].append(text_list[i])
-        else:
-            klist[c]=[text_list[i]]
-    # pprint.pprint(klist)
+    klist=kmeans_content(text_list,tokenizer,model,num_clusters)
     return klist
-
-
-
-
-    # #绘图
-
-    # x=presentence_embedding
-    # # plot
-    # plt.figure(figsize=(4, 3), dpi=160)
-    # plt.scatter(x[:, 0], x[:, 1], c=cluster_ids_x, cmap='cool')
-    # # plt.scatter(y[:, 0], y[:, 1], c=cluster_ids_y, cmap='cool', marker='X')
-    # plt.scatter(
-    #     cluster_centers[:, 0], cluster_centers[:, 1],
-    #     c='white',
-    #     alpha=0.6,
-    #     edgecolors='black',
-    #     linewidths=2
+    # presentence_embedding,text_list,labels=get_embedding(text_list,[],tokenizer,model)
+    # # print("总共数据：",len(presentence_embedding))
+    # presentence_embedding=torch.tensor(presentence_embedding, dtype=torch.long)
+    # # print(text_list,labels)
+    
+    # # # print('x',x )
+    # # # # # kmeans
+    # cluster_ids_x, cluster_centers = kmeans(
+    #     X=presentence_embedding, num_clusters=num_clusters, distance='euclidean', device=torch.device('cpu'),tol=1e-8
     # )
-    # plt.axis([-1, 1, -1, 1])
-    # plt.tight_layout()
-    # plt.show()
+    # # print('cluster_ids_x',cluster_ids_x)
+    # # print("cluster_centers",cluster_centers)
+
+    # # output_dir='./model'
+    # # torch.save(cluster_centers, os.path.join(output_dir, 'Kmean.bin'))
+
+
+    # klist={}
+
+    # for i,c in enumerate (cluster_ids_x.tolist()):
+    #     # print(i,c,text_list)
+    #     if klist.get(c):
+    #         klist[c].append(text_list[i])
+    #     else:
+    #         klist[c]=[text_list[i]]
+    # # pprint.pprint(klist)
+    # return klist
+
+
+
+
+    # # #绘图
+
+    # # x=presentence_embedding
+    # # # plot
+    # # plt.figure(figsize=(4, 3), dpi=160)
+    # # plt.scatter(x[:, 0], x[:, 1], c=cluster_ids_x, cmap='cool')
+    # # # plt.scatter(y[:, 0], y[:, 1], c=cluster_ids_y, cmap='cool', marker='X')
+    # # plt.scatter(
+    # #     cluster_centers[:, 0], cluster_centers[:, 1],
+    # #     c='white',
+    # #     alpha=0.6,
+    # #     edgecolors='black',
+    # #     linewidths=2
+    # # )
+    # # plt.axis([-1, 1, -1, 1])
+    # # plt.tight_layout()
+    # # plt.show()
