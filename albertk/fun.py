@@ -100,17 +100,27 @@ def get_embedding_np(text_list,labels,tokenizer,model):
     """
     # text_list=["你好吗",'我很不错']
     # li=torch.tensor([])  # 现有list时尽量用这种方式
-    # print(text_list)
+    print("\n"*10)
+
+    print("text_list:",len(text_list))
     del_list=[]
     new_labels=[]
     new_text_list=[]
-    # presentence_embedding=None
+    presentence_embedding=None
     if len(text_list)>=0:
         pass
     else:
         return
     for i,text in enumerate( text_list):
-        # print(text)
+        text=text[:300]
+        # print("###"*30)
+        # # print(text)
+        # print(len(text))
+        if len(text)==0:
+            
+            # print("全部错误")
+            break
+
 
 
         # print(input_ids)
@@ -135,12 +145,16 @@ def get_embedding_np(text_list,labels,tokenizer,model):
                 new_labels.append(labels[i])
  
         except:
+            # print("shib")
             # traceback.print_exc()
             pass
+
+
     # print(presentence_embedding)
     # print(new_text_list,new_labels)
     # presentence_embedding = torch.from_numpy(presentence_embedding)   #为numpy类型
-    # print( "presentence_embedding",presentence_embedding.size())
+    # print( "presentence_embedding",presentence_embedding)
+
     return presentence_embedding,new_text_list,new_labels
 
 
@@ -257,7 +271,7 @@ def auto_train(new_text_list,marked_text,marked_label,tokenizer,model,n_neighbor
     labels=marked_label+[-1]*len(new_text_list)
 
     text_list=marked_text+new_text_list
-    # print(text_list)
+    # print(text_list[:5])
     # for i,it in enumerate(text_list) :
     #     if len(it)>5:
     #         pass

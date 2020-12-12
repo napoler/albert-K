@@ -31,7 +31,7 @@ print(klist)
 """
 setup(
     name='albertk',
-    version='0.0.1.3',
+    version='0.0.1.33',
     description='Terry albertk',
     author='Terry Chan',
     author_email='napoler2008@gmail.com',
